@@ -7,6 +7,8 @@ import time
 import Queue
 import numpy as np
 import librosa
+import pretty_midi
+import random
 
 
 def midi_to_stft(midi, fs=22050, **kwargs):
@@ -24,11 +26,12 @@ def midi_to_stft(midi, fs=22050, **kwargs):
         - stft : np.ndarray
             STFT matrix
     '''
-    audio_data = midi.fluidsynth(fs=22050)
+    audio_data = midi.synthesize(fs=fs)
     return librosa.stft(audio_data, **kwargs)
 
 
-def midi_to_stacked_piano_roll(midi, hop_seconds=2048/4/22050.):
+def midi_to_stacked_piano_roll(midi, hop_seconds=2048/4/22050., min_note=20,
+                               max_note=100):
     '''
     Converts MIDI data into matrix of stacked piano rolls, one for each
     instrument class.
@@ -39,11 +42,43 @@ def midi_to_stacked_piano_roll(midi, hop_seconds=2048/4/22050.):
             MIDI data object
         - hop_seconds : float
             Time between each column in the piano roll matrix
+        - min_note : int
+            Lowest note in the piano roll to consider.
+        - max_note : int
+            Highest note in the piano roll to consider.
+            :w
 
     :returns:
         - stacked_piano_roll : np.ndarray
             Stacked piano roll representation
     '''
+    n_notes = max_note - min_note
+    # Start index in the stacked piano roll of each instrument class
+    stacked_index = {'Piano' : 0, 'Chromatic Percussion' : n_notes,
+                     'Organ' : 2*n_notes, 'Guitar' : 3*n_notes,
+                     'Bass' : 4*n_notes, 'Strings' : 5*n_notes,
+                     'Ensemble' : 6*n_notes, 'Brass' : 7*n_notes,
+                     'Reed' : 8*n_notes, 'Pipe' : 9*n_notes,
+                     'Synth Lead' : 10*n_notes, 'Synth Pad' : 11*n_notes,
+                     'Ethnic' : 12*n_notes, 'Percussive' : 13*n_notes}
+    # Initialize stacked piano roll
+    times = np.arange(0, midi.get_end_time(), hop_seconds)
+    stacked_piano_roll = np.zeros((14*n_notes, times.shape[0]))
+    # This will map program number to the stacked piano roll
+    for instrument in midi.instruments:
+        ins_class = pretty_midi.program_to_instrument_class(instrument.program)
+        # Skip drum and effects instruments
+        if instrument.is_drum or \
+           'Effects' in ins_class:
+            continue
+        # Get the piano roll for this instrument
+        piano_roll = instrument.get_piano_roll(fs=1./hop_seconds)
+        # Determine row and column indices to add in piano roll
+        index = stacked_index[ins_class]
+        note_range = np.r_[index:index + n_notes]
+        n_col = piano_roll.shape[1]
+        stacked_piano_roll[note_range, :n_col] += piano_roll[min_note:max_note]
+    return stacked_piano_roll
 
 
 def split_mag_phase(complex_matrix):
@@ -61,6 +96,7 @@ def split_mag_phase(complex_matrix):
             Matrix with magnitude and phase split into two parts
             shape=(2*complex_matrix.shape[0], complex_matrix.shape[1])
     '''
+    return np.vstack([np.abs(complex_matrix), np.angle(complex_matrix)])
 
 
 def shingle(x, stacks):
@@ -106,6 +142,33 @@ def midi_stft_generator(file_list):
         - file_list : iterable
             Iterable list of MIDI files
     '''
+    # Randomize the order of training
+    shuffled_file_list = list(file_list)
+    random.shuffle(shuffled_file_list)
+    for filename in shuffled_file_list:
+        # Load in MIDI data
+        midi = pretty_midi.PrettyMIDI(filename)
+        # Synthesize and compute STFT
+        stft = midi_to_stft(midi)
+        # Create stacked matrix of STFT phase and magnitude
+        Y = split_mag_phase(stft)
+        # Create piano roll of each instrument class, stacked
+        X = midi_to_stacked_piano_roll(midi)
+        # Standardize the input features
+        X_mean, X_std = standardize(X)
+        X = (X - X_mean)/X_std
+        # Shingle every 4 columns
+        X = shingle(X, 4)
+        # Trim the smaller representation
+        if Y.shape[1] > X.shape[1]:
+            Y = Y[:, :X.shape[1]]
+        else:
+            X = X[:, :Y.shape[1]]
+        # Randomly shuffle the order of training examples
+        shuffle_indices = np.random.permutation(X.shape[1])
+        X = X[:, shuffle_indices]
+        Y = Y[:, shuffle_indices]
+        yield X, Y
 
 
 def buffered_gen_mp(source_gen, buffer_size=2, sleep_time=1):
