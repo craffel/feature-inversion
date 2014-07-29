@@ -11,7 +11,7 @@ import pretty_midi
 import random
 
 
-def midi_to_stft(midi, fs=22050, **kwargs):
+def midi_to_stft(midi, fs=8000, **kwargs):
     '''
     Convert MIDI data to an STFT of its synthesized audio data.
     kwargs will be passed to librosa.stft
@@ -27,10 +27,10 @@ def midi_to_stft(midi, fs=22050, **kwargs):
             STFT matrix
     '''
     audio_data = midi.synthesize(fs=fs)
-    return librosa.stft(audio_data, **kwargs)
+    return librosa.stft(audio_data, n_fft=1024, **kwargs)
 
 
-def midi_to_stacked_piano_roll(midi, hop_seconds=2048/4/22050., min_note=20,
+def midi_to_stacked_piano_roll(midi, hop_seconds=1024/4/8000., min_note=20,
                                max_note=100):
     '''
     Converts MIDI data into matrix of stacked piano rolls, one for each
@@ -46,7 +46,6 @@ def midi_to_stacked_piano_roll(midi, hop_seconds=2048/4/22050., min_note=20,
             Lowest note in the piano roll to consider.
         - max_note : int
             Highest note in the piano roll to consider.
-            :w
 
     :returns:
         - stacked_piano_roll : np.ndarray
