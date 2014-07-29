@@ -30,6 +30,31 @@ def midi_to_stft(midi, fs=8000, **kwargs):
     return librosa.stft(audio_data, n_fft=1024, **kwargs)
 
 
+def midi_to_piano_roll(midi, hop_seconds=1024/4/8000., min_note=20,
+                       max_note=100):
+    '''
+    Converts MIDI data into a piano roll flattened across instruments.
+    Drum instruments and special effects are ignored.
+
+    :parameters:
+        - midi : pretty_midi.PrettyMIDI
+            MIDI data object
+        - hop_seconds : float
+            Time between each column in the piano roll matrix
+        - min_note : int
+            Lowest note in the piano roll to consider.
+        - max_note : int
+            Highest note in the piano roll to consider.
+
+    :returns:
+        - piano_roll : np.ndarray
+            Piano roll representation
+    '''
+    # Return the flattened piano roll at the specified hop rate over the
+    # specified note range
+    return midi.get_piano_roll(fs=1./hop_seconds)[min_note:max_note, :]
+
+
 def midi_to_stacked_piano_roll(midi, hop_seconds=1024/4/8000., min_note=20,
                                max_note=100):
     '''
@@ -115,6 +140,25 @@ def shingle(x, stacks):
                       for n in xrange(stacks)])
 
 
+def symmetric_shingle(x, stacks):
+    ''' Shingles a matrix column-wise symmetrically
+
+    :parameters:
+        - x : np.ndarray
+            Matrix to shingle
+        - stacks : int
+            Number of copies of each column to stack
+
+    :returns:
+        - x_shingled : np.ndarray
+            X with columns stacked symmetrically
+    '''
+    return np.vstack([np.pad(x, ((0, 0), (n, 0)), mode='constant')[:, :-n]
+                      for n in xrange(1, stacks + 1)] + [x] +
+                     [np.pad(x, ((0, 0), (0, n)), mode='constant')[:, n:]
+                      for n in xrange(1, stacks + 1)])
+
+
 def standardize(X):
     ''' Return column vectors to standardize X, via (X - X_mean)/X_std
 
@@ -152,13 +196,14 @@ def midi_stft_generator(file_list):
         # Create stacked matrix of STFT phase and magnitude
         Y = split_mag_phase(stft)
         # Create piano roll of each instrument class, stacked
-        X = midi_to_stacked_piano_roll(midi)
+        X = midi_to_piano_roll(midi)
         # Standardize the input features
         X_mean, X_std = standardize(X)
         X = (X - X_mean)/X_std
-        # Shingle every 4 columns
-        X = shingle(X, 4)
+        # Shingle every 2 columns
+        X = symmetric_shingle(X, 2)
         # Trim the smaller representation
+        print X.shape, Y.shape
         if Y.shape[1] > X.shape[1]:
             Y = Y[:, :X.shape[1]]
         else:
