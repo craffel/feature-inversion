@@ -182,37 +182,39 @@ def midi_stft_generator(file_list):
     Shuffles both the file list and the columns of the STFTs/piano rolls.
 
     :parameters:
-        - file_list : iterable
+        - file_list : list
             Iterable list of MIDI files
     '''
     # Randomize the order of training
     shuffled_file_list = list(file_list)
     random.shuffle(shuffled_file_list)
-    for filename in shuffled_file_list:
-        # Load in MIDI data
-        midi = pretty_midi.PrettyMIDI(filename)
-        # Synthesize and compute STFT
-        stft = midi_to_stft(midi)
-        # Create stacked matrix of STFT phase and magnitude
-        Y = split_mag_phase(stft)
-        # Create piano roll of each instrument class, stacked
-        X = midi_to_piano_roll(midi)
-        # Standardize the input features
-        X_mean, X_std = standardize(X)
-        X = (X - X_mean)/X_std
-        # Shingle every 2 columns
-        X = symmetric_shingle(X, 2)
-        # Trim the smaller representation
-        print X.shape, Y.shape
-        if Y.shape[1] > X.shape[1]:
-            Y = Y[:, :X.shape[1]]
-        else:
-            X = X[:, :Y.shape[1]]
-        # Randomly shuffle the order of training examples
-        shuffle_indices = np.random.permutation(X.shape[1])
-        X = X[:, shuffle_indices]
-        Y = Y[:, shuffle_indices]
-        yield X, Y
+    # Iterate over the list indefinitely
+    while True:
+        for filename in shuffled_file_list:
+            # Load in MIDI data
+            midi = pretty_midi.PrettyMIDI(filename)
+            # Synthesize and compute STFT
+            stft = midi_to_stft(midi)
+            # Create stacked matrix of STFT phase and magnitude
+            Y = split_mag_phase(stft)
+            # Create piano roll of each instrument class, stacked
+            X = midi_to_piano_roll(midi)
+            # Standardize the input features
+            X_mean, X_std = standardize(X)
+            X = (X - X_mean)/X_std
+            # Shingle every 2 columns
+            X = symmetric_shingle(X, 2)
+            # Trim the smaller representation
+            print X.shape, Y.shape
+            if Y.shape[1] > X.shape[1]:
+                Y = Y[:, :X.shape[1]]
+            else:
+                X = X[:, :Y.shape[1]]
+            # Randomly shuffle the order of training examples
+            shuffle_indices = np.random.permutation(X.shape[1])
+            X = X[:, shuffle_indices]
+            Y = Y[:, shuffle_indices]
+            yield X, Y
 
 
 def buffered_gen_mp(source_gen, buffer_size=2, sleep_time=1):
