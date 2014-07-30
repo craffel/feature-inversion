@@ -214,9 +214,13 @@ def midi_stft_generator(file_list, shuffle_indices=True):
     # Iterate over the list indefinitely
     while True:
         for filename in shuffled_file_list:
-            print 'Loading {}'.format(filename)
             # Load in MIDI data
-            midi = pretty_midi.PrettyMIDI(filename)
+            try:
+                midi = pretty_midi.PrettyMIDI(filename)
+            except:
+                print 'Error loading {}'.format(filename)
+                continue
+            print 'Loading {}'.format(filename)
             # Synthesize and compute STFT
             stft = midi_to_stft(midi)
             # Create stacked matrix of STFT phase and magnitude
