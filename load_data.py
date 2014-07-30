@@ -197,7 +197,7 @@ def midi_stft_generator(file_list):
             stft = midi_to_stft(midi)
             # Create stacked matrix of STFT phase and magnitude
             Y = split_mag_phase(stft)
-            # Create piano roll of each instrument class, stacked
+            # Create piano roll
             X = midi_to_piano_roll(midi)
             # Standardize the input features
             X_mean, X_std = standardize(X)
