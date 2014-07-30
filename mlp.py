@@ -37,7 +37,7 @@ class Layer(object):
                 W_values *= 4
             # Create theano shared variable for W
             W = theano.shared(value=W_values, name='W', borrow=True)
-        # Initialize b to zeros
+        # Initialize b to ones
         if b is None:
             b = theano.shared(value=np.ones((n_output, 1),
                                             dtype=theano.config.floatX),
@@ -85,7 +85,7 @@ class MLP(object):
                 Default None, which means initialize randomly
             activations - List of length n_layers of activation function for
             each layer
-                Default None, which means all layers are tanh
+                Default None, which means all layers are relu
         '''
         # Check that we received layer sizes or weight matrices + bias vectors
         if layer_sizes is None and Ws is None:
@@ -111,7 +111,7 @@ class MLP(object):
 
         # All activations are tanh if none was provided
         if activations is None:
-            activations = [T.tanh]*(len(layer_sizes) - 1)
+            activations = [relu]*(len(layer_sizes) - 1)
 
         # Construct the layers
         for n, (n_input, n_output,

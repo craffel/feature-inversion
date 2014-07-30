@@ -13,10 +13,10 @@ validate_glob = glob.glob('data/midi_validate/*/*.mid')
 # How many hidden layers?
 n_hidden = 3
 # SGD learning rate and momentum
-learning_rate = .001
+learning_rate = .000001
 momentum = .99
 # How often should we generate example output?
-check_frequency = 100
+check_frequency = 10
 
 # Create generater objects over the datasets
 train_generator = load_data.midi_stft_generator(train_glob)
