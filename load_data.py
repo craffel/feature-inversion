@@ -176,7 +176,7 @@ def standardize(X):
     return np.mean(X, axis=1).reshape(-1, 1), std + (std == 0)
 
 
-def midi_stft_generator(file_list):
+def midi_stft_generator(file_list, shuffle_indices=True):
     '''
     Given an iterable of MIDI files, generate STFTs and piano rolls of each.
     Shuffles both the file list and the columns of the STFTs/piano rolls.
@@ -184,6 +184,8 @@ def midi_stft_generator(file_list):
     :parameters:
         - file_list : list
             Iterable list of MIDI files
+        - shuffle_indices : bool
+            Should the columns loaded by each file be shuffled?
     '''
     # Randomize the order of training
     shuffled_file_list = list(file_list)
@@ -191,6 +193,7 @@ def midi_stft_generator(file_list):
     # Iterate over the list indefinitely
     while True:
         for filename in shuffled_file_list:
+            print 'Loading {}'.format(filename)
             # Load in MIDI data
             midi = pretty_midi.PrettyMIDI(filename)
             # Synthesize and compute STFT
@@ -205,15 +208,15 @@ def midi_stft_generator(file_list):
             # Shingle every 2 columns
             X = symmetric_shingle(X, 2)
             # Trim the smaller representation
-            print X.shape, Y.shape
             if Y.shape[1] > X.shape[1]:
                 Y = Y[:, :X.shape[1]]
             else:
                 X = X[:, :Y.shape[1]]
-            # Randomly shuffle the order of training examples
-            shuffle_indices = np.random.permutation(X.shape[1])
-            X = X[:, shuffle_indices]
-            Y = Y[:, shuffle_indices]
+            if shuffle_indices:
+                # Randomly shuffle the order of training examples
+                shuffled_indices = np.random.permutation(X.shape[1])
+                X = X[:, shuffled_indices]
+                Y = Y[:, shuffled_indices]
             yield X, Y
 
 
