@@ -123,6 +123,27 @@ def split_mag_phase(complex_matrix):
     return np.vstack([np.abs(complex_matrix), np.angle(complex_matrix)])
 
 
+def flatten_mag_phase(split_matrix):
+    '''
+    Given a real-valued matrix with shame (M, N) where the first M/2 rows
+    correspond to the magnitude of complex values and the second M/2 rows
+    correspond to the phase, create a new matrix with half the number of rows
+    with complex values.
+
+    :parameters:
+        - split_matrix : np.ndarray, dtype=np.float
+            Matrix with magnitude and phase split into two parts
+
+    :returns:
+        - complex_matrix : np.ndarray, dtype=np.complex
+            Complex-value matrix
+            shape=(split_matrix.shape[0]/2, split_matrix.shape[1])
+    '''
+    mag = split_matrix[:split_matrix.shape[0]/2, :]
+    phase = split_matrix[split_matrix.shape[0]/2:, :]
+    return mag*np.exp(1j*phase)
+
+
 def shingle(x, stacks):
     ''' Shingles a matrix column-wise
 
