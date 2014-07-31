@@ -49,12 +49,15 @@ train = theano.function([input, target_output],
 # Function for computing the network output
 network_output = theano.function([input], inverter.output(input))
 
-for n, (X, Y) in enumerate(train_generator):
-    train_cost = train(X, Y)
-    print "Iteration {}, cost {}".format(n, train_cost)
-    # Write out a wav file from the validation set
-    if n and (not n % check_frequency):
-        X, Y = validate_generator.next()
-        Y_pred = network_output(X)
-        y_pred = librosa.istft(load_data.flatten_mag_phase(Y_pred))
-        librosa.output.write_wav('{}.wav'.format(n), y_pred, 8000)
+try:
+    for n, (X, Y) in enumerate(train_generator):
+        train_cost = train(X, Y)
+        print "Iteration {}, cost {}".format(n, train_cost)
+        # Write out a wav file from the validation set
+        if n and (not n % check_frequency):
+            X, Y = validate_generator.next()
+            Y_pred = network_output(X)
+            y_pred = librosa.istft(load_data.flatten_mag_phase(Y_pred))
+            librosa.output.write_wav('{}.wav'.format(n), y_pred, 8000)
+except KeyboardInterrupt:
+    print "Ran {} iterations, final training cost {}".format(n, train_cost)
