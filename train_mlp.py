@@ -14,7 +14,7 @@ validate_glob = glob.glob('data/midi_validate/*/*.mid')
 n_hidden = 3
 # SGD learning rate and momentum
 learning_rate = .000001
-momentum = .99
+momentum = .999
 # How often should we generate example output?
 check_frequency = 10
 
