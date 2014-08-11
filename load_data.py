@@ -197,7 +197,34 @@ def standardize(X):
     return np.mean(X, axis=1).reshape(-1, 1), std + (std == 0)
 
 
-def midi_stft_generator(file_list, shuffle_indices=True):
+def midi_to_features(midi):
+    '''
+    Chains functions for MIDI feature extraction.
+
+    :parameters:
+        - midi : pretty_midi.PrettyMIDI
+            MIDI data
+    '''
+    # Synthesize and compute STFT
+    stft = midi_to_stft(midi)
+    # Create stacked matrix of STFT phase and magnitude
+    Y = split_mag_phase(stft)
+    # Create piano roll
+    X = midi_to_piano_roll(midi)
+    # Standardize the input features
+    X_mean, X_std = standardize(X)
+    X = (X - X_mean)/X_std
+    # Shingle every 2 columns
+    X = symmetric_shingle(X, 2)
+    # Trim the smaller representation
+    if Y.shape[1] > X.shape[1]:
+        Y = Y[:, :X.shape[1]]
+    else:
+        X = X[:, :Y.shape[1]]
+    return X, Y
+
+
+def midi_stft_generator(file_list, batch_size=1, n_queue=100000):
     '''
     Given an iterable of MIDI files, generate STFTs and piano rolls of each.
     Shuffles both the file list and the columns of the STFTs/piano rolls.
@@ -205,12 +232,18 @@ def midi_stft_generator(file_list, shuffle_indices=True):
     :parameters:
         - file_list : list
             Iterable list of MIDI files
-        - shuffle_indices : bool
-            Should the columns loaded by each file be shuffled?
+        - batch_size : int
+            Size of each mini batch being generated.
+        - n_queue : int
+            Always have at least this many examples queued
     '''
     # Randomize the order of training
     shuffled_file_list = list(file_list)
     random.shuffle(shuffled_file_list)
+    # Where in the concatenated queue are we reading from?
+    queue_idx = 0
+    Xs = None
+    Ys = None
     # Iterate over the list indefinitely
     while True:
         for filename in shuffled_file_list:
@@ -221,28 +254,27 @@ def midi_stft_generator(file_list, shuffle_indices=True):
                 print 'Error loading {}'.format(filename)
                 continue
             print 'Loading {}'.format(filename)
-            # Synthesize and compute STFT
-            stft = midi_to_stft(midi)
-            # Create stacked matrix of STFT phase and magnitude
-            Y = split_mag_phase(stft)
-            # Create piano roll
-            X = midi_to_piano_roll(midi)
-            # Standardize the input features
-            X_mean, X_std = standardize(X)
-            X = (X - X_mean)/X_std
-            # Shingle every 2 columns
-            X = symmetric_shingle(X, 2)
-            # Trim the smaller representation
-            if Y.shape[1] > X.shape[1]:
-                Y = Y[:, :X.shape[1]]
+            X, Y = midi_to_features(midi)
+            if Xs is None:
+                Xs = X
+                Ys = Y
             else:
-                X = X[:, :Y.shape[1]]
-            if shuffle_indices:
-                # Randomly shuffle the order of training examples
-                shuffled_indices = np.random.permutation(X.shape[1])
-                X = X[:, shuffled_indices]
-                Y = Y[:, shuffled_indices]
-            yield X, Y
+                Xs = np.hstack([Xs, X])
+                Ys = np.hstack([Ys, Y])
+            # Randomly shuffle the order of training examples
+            shuffled_indices = np.random.permutation(Xs.shape[1])
+            Xs = Xs[:, shuffled_indices]
+            Ys = Ys[:, shuffled_indices]
+            queue_idx = Xs.shape[1]
+            while True:
+                if queue_idx < n_queue:
+                    print "Have {}, need {}".format(queue_idx, n_queue)
+                    Xs = Xs[:, :queue_idx]
+                    Ys = Ys[:, :queue_idx]
+                    break
+                yield (Xs[:, queue_idx - batch_size:queue_idx],
+                       Ys[:, queue_idx - batch_size:queue_idx])
+                queue_idx -= batch_size
 
 
 def buffered_gen_mp(source_gen, buffer_size=2, sleep_time=1):
