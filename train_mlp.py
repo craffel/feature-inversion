@@ -15,14 +15,13 @@ validate_glob = glob.glob('data/midi_validate/*/*.mid')
 # How many hidden layers?
 n_hidden = 3
 # SGD learning rate and momentum
-learning_rate = .00001
+initial_learning_rate = .01
 momentum = .99
 # How often should we generate example output?
 check_frequency = 1000
 
 # Create generater objects over the datasets
 train_generator = load_data.midi_stft_generator(train_glob, batch_size=1)
-# validate_generator = load_data.midi_stft_generator(validate_glob,
 
 # Load in example data point
 X, Y = train_generator.next()
@@ -40,8 +39,11 @@ inverter = mlp.MLP(layer_sizes)
 # Squared error cost function
 error = T.sum((inverter.output(input) - target_output)**2)
 
+iteration = T.scalar('iteration')
+learning_rate = initial_learning_rate/(iteration + 1)
+
 # Function for optimizing the neural net parameters, by minimizing cost
-train = theano.function([input, target_output],
+train = theano.function([input, target_output, iteration],
                         error,
                         updates=mlp.gradient_updates_momentum(error,
                                                               inverter.params,
@@ -54,7 +56,7 @@ cost = theano.function([input, target_output], error)
 
 try:
     for n, (X, Y) in enumerate(train_generator):
-        train_cost = train(X, Y)
+        train_cost = train(X, Y, n)
         # Write out a wav file from the validation set
         if n and (not n % check_frequency):
             midi = pretty_midi.PrettyMIDI(random.choice(validate_glob))
