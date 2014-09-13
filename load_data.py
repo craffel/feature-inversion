@@ -255,6 +255,9 @@ def midi_stft_generator(file_list, batch_size=1, n_queue=100000):
                 continue
             print 'Loading {}'.format(filename)
             X, Y = midi_to_features(midi)
+            # Avoid NaNs
+            if np.isnan(X).any() or np.isnan(Y).any():
+                continue
             if Xs is None:
                 Xs = X
                 Ys = Y
