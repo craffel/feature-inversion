@@ -253,6 +253,9 @@ def midi_stft_generator(file_list, batch_size=1, n_queue=100000):
             except:
                 print 'Error loading {}'.format(filename)
                 continue
+            # Skip long songs (probably invalid)
+            if midi.get_end_time() > 600:
+                continue
             print 'Loading {}'.format(filename)
             X, Y = midi_to_features(midi)
             # Avoid NaNs
